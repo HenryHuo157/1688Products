@@ -549,7 +549,7 @@ async function reactLoop(state) {
     }
     if (upd.agent && upd.agent.messages) {
       const m = upd.agent.messages[upd.agent.messages.length - 1];
-      const r = m && m.additional_kwargs && m.additional_kwargs.reasoning_content;
+      const r = m && m.additional_kwargs && (m.additional_kwargs.reasoning_content || m.additional_kwargs.reasoning);
       if (r && thinkCb) thinkCb(String(r).slice(0, 800));
       if (m && m.tool_calls && m.tool_calls.length) {
         m.tool_calls.forEach((tc) => {
@@ -573,11 +573,15 @@ async function llmAnswer(msgs) {
   if (streamCb) {
     let full = '';
     try {
-      // 原生SSE直连: LangChain适配层会丢弃reasoning_content,这里手动解析以获得思考链
+      // 原生SSE直连: LangChain适配层会丢弃思考链,这里手动解析以获得思考过程
+      // 智谱用 reasoning_content + thinking参数; OpenRouter/其他用 reasoning 字段
+      const isZhipu = AI_BASE.includes('bigmodel');
       const res = await fetch(AI_BASE + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_KEY },
-        body: JSON.stringify({ model: AI_MODEL, thinking: { type: 'enabled' }, max_tokens: 4096, stream: true, messages: msgs }),
+        body: JSON.stringify(Object.assign(
+          { model: AI_MODEL, max_tokens: 4096, stream: true, messages: msgs },
+          isZhipu ? { thinking: { type: 'enabled' } } : {})),
       });
       if (res.ok && res.body) {
         const reader = res.body.getReader();
@@ -596,7 +600,8 @@ async function llmAnswer(msgs) {
             if (payload === '[DONE]') break outer;
             try {
               const delta = JSON.parse(payload).choices?.[0]?.delta || {};
-              if (delta.reasoning_content && thinkCb) thinkCb(String(delta.reasoning_content));
+              const r = delta.reasoning_content || delta.reasoning;
+              if (r && thinkCb) thinkCb(String(r));
               if (delta.content) { full += delta.content; streamCb(String(delta.content)); }
             } catch (_) {}
           }
