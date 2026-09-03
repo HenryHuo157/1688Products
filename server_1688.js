@@ -321,6 +321,8 @@ const HTML = String.raw`<!DOCTYPE html>
   .cp-think .cp-think-hint { font-size:10.5px; color:#B9B5A6; }
   .cp-think-body { padding:4px 14px 10px; font-size:11.5px; color:#989487; line-height:1.7;
                    white-space:pre-wrap; max-height:220px; overflow-y:auto; border-top:1px dashed #E2DED1; }
+  .cp-waitdots { animation:cpwait 1.2s infinite; color:#C96442; letter-spacing:5px; font-size:9px; }
+  @keyframes cpwait { 0%,100%{opacity:.25} 50%{opacity:1} }
   #chatOpen { background:linear-gradient(135deg,#5b7cfa,#3a57e0); border:0; cursor:pointer; }
   #chatOpen:hover { background:linear-gradient(135deg,#4a6bef,#2f49d0); box-shadow:0 3px 14px rgba(58,87,224,.45); }
   /* 移动端/窄屏适配 */
@@ -960,19 +962,58 @@ var cpSid = 'webtool', cpBusy = false, cpLastRows = [];
 /* 轻量Markdown渲染(加粗/标题/列表/代码),先esc防注入 */
 function cpMD(t) {
   var s = esc(String(t || ''));
-  var lines = s.split('\n'), out = [], inUl = false;
-  lines.forEach(function(ln) {
-    ln = ln.replace(/\*\*([^*]+)\*\*/g, '<b style="color:#3d2e22">$1</b>')
-           .replace(new RegExp('\u0060([^\u0060]+)\u0060', 'g'), '<code style="background:#f1eee4;border-radius:4px;padding:0 4px;font-size:12px">$1</code>');
-    var h = ln.match(/^(#{1,3})\s+(.*)/);
-    if (h) { if (inUl) { out.push('</ul>'); inUl = false; } out.push('<div style="font-weight:700;font-size:14px;margin:8px 0 4px">' + h[2] + '</div>'); return; }
-    var li = ln.match(/^\s*[-*]\s+(.*)/);
-    if (li) { if (!inUl) { out.push('<ul style="margin:4px 0 4px 18px;padding:0">'); inUl = true; } out.push('<li style="margin:3px 0">' + li[1] + '</li>'); return; }
-    if (inUl) { out.push('</ul>'); inUl = false; }
-    if (ln.trim() === '') { out.push('<div style="height:6px"></div>'); return; }
-    out.push('<div>' + ln + '</div>');
-  });
-  if (inUl) out.push('</ul>');
+  var lines = s.split('\n'), out = [], inUl = false, inOl = false;
+  function closeLists() { if (inUl) { out.push('</ul>'); inUl = false; } if (inOl) { out.push('</ol>'); inOl = false; } }
+  function inline(x) {
+    return String(x)
+      .replace(/\*\*([^*]+)\*\*/g, '<b style="color:#3d2e22">$1</b>')
+      .replace(new RegExp('\u0060([^\u0060]+)\u0060', 'g'), '<code style="background:#f1eee4;border-radius:4px;padding:0 4px;font-size:12px">$1</code>');
+  }
+  function splitRow(l) { return l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function(x){ return x.trim(); }); }
+  var i = 0;
+  while (i < lines.length) {
+    var ln = lines[i];
+    // Markdown表格: 本行为|...|且下一行是|---|分隔行 → 渲染成真表格
+    if (/^\s*\|.+\|\s*$/.test(ln) && i + 1 < lines.length && /^\s*\|[\s:|-]*\|\s*$/.test(lines[i + 1])) {
+      closeLists();
+      var hdr = splitRow(ln); i += 2;
+      var body = [];
+      while (i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])) { body.push(splitRow(lines[i])); i++; }
+      var th = '<div style="overflow-x:auto;margin:6px 0"><table><thead><tr>' +
+        hdr.map(function(c){ return '<th>' + inline(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+      body.forEach(function(r) {
+        th += '<tr>' + hdr.map(function(_, ci){ return '<td>' + inline(r[ci] || '') + '</td>'; }).join('') + '</tr>';
+      });
+      out.push(th + '</tbody></table></div>');
+      continue;
+    }
+    var hh = ln.match(/^(#{1,4})\s+(.*)/);
+    if (hh) {
+      closeLists();
+      var big = hh[1].length <= 2;
+      out.push('<div style="font-weight:700;font-size:' + (big ? '14px' : '13px') + ';color:#B0522F;margin:10px 0 5px;border-left:3px solid #C96442;padding-left:8px;line-height:1.5">' + inline(hh[2]) + '</div>');
+      i++; continue;
+    }
+    var uli = ln.match(/^\s*[-*]\s+(.*)/);
+    if (uli) {
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      if (!inUl) { out.push('<ul style="margin:4px 0 4px 18px;padding:0">'); inUl = true; }
+      out.push('<li style="margin:3px 0">' + inline(uli[1]) + '</li>');
+      i++; continue;
+    }
+    var oli = ln.match(/^\s*\d+[.、)]\s+(.*)/);
+    if (oli) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (!inOl) { out.push('<ol style="margin:4px 0 4px 20px;padding:0">'); inOl = true; }
+      out.push('<li style="margin:3px 0">' + inline(oli[1]) + '</li>');
+      i++; continue;
+    }
+    closeLists();
+    if (ln.trim() === '') { out.push('<div style="height:6px"></div>'); i++; continue; }
+    out.push('<div>' + inline(ln) + '</div>');
+    i++;
+  }
+  closeLists();
   return out.join('');
 }
 function cpAdd(cls, html) {
@@ -1061,21 +1102,41 @@ function cpSend(text, confirm) {
   cpBusy = true;
   if (!confirm && text) cpAdd('user', esc(text));
   var w = cpAdd('sys', confirm ? '正在执行…' : 'AI思考中…');
-  var bot = null, acc = '', thinkBox = null, thinkBody = null, thinkOpen = false;
+  var bot = null, acc = '', thinkBox = null, thinkBody = null, thinkOpen = false, thinkBuf = '', traceLines = [];
   var ensureBot = function() { if (!bot) { w.remove(); bot = cpAdd('bot', ''); } return bot; };
+  var lgScroll = function() { var lg = document.getElementById('cpLog'); lg.scrollTop = lg.scrollHeight; };
   var ensureThink = function() {
     if (!thinkBox) {
       thinkBox = document.createElement('div');
       thinkBox.className = 'cp-think';
-      thinkBox.innerHTML = '<details open><summary>💭 思考过程<span class="cp-think-hint">(点击收起)</span></summary><div class="cp-think-body"></div></details>';
+      thinkBox.innerHTML = '<details open><summary>💭 思考中…<span class="cp-think-hint">(点击收起)</span></summary><div class="cp-think-body"></div></details>';
       var lg = document.getElementById('cpLog'); lg.appendChild(thinkBox);
       thinkBody = thinkBox.querySelector('.cp-think-body');
+      thinkBody.innerHTML = '<span class="cp-waitdots">● ● ●</span>';
       thinkOpen = true;
     }
     return thinkBody;
   };
-  var addThink = function(t) { ensureThink().textContent += (thinkBody.textContent ? '\n' : '') + t; lgScroll(); };
-  var lgScroll = function() { var lg = document.getElementById('cpLog'); lg.scrollTop = lg.scrollHeight; };
+  // 思考token是逐字小块: 缓冲拼接成一段连续文字,不逐块加换行;工具调用单独成行
+  var renderThink = function() {
+    ensureThink();
+    var txt = thinkBuf;
+    if (traceLines.length) txt += (txt ? '\n' : '') + traceLines.join('\n');
+    thinkBody.textContent = txt;
+    thinkBody.scrollTop = thinkBody.scrollHeight;
+    lgScroll();
+  };
+  var addThink = function(t) {
+    if (w.parentNode) { w.remove(); }
+    thinkBuf += t;
+    renderThink();
+  };
+  var addTraceLine = function(t) {
+    if (w.parentNode) { w.remove(); }
+    traceLines.push('🔧 ' + t);
+    renderThink();
+  };
+  ensureThink();
   fetch('/ai/stream', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(confirm ? { sessionId: cpSid, resume: true } : { sessionId: cpSid, question: text }) })
   .then(function(r) {
@@ -1098,17 +1159,23 @@ function cpSend(text, confirm) {
           if (blk.slice(0, 6) !== 'data: ') return;
           var ev; try { ev = JSON.parse(blk.slice(6)); } catch (_) { return; }
           if (ev.type === 'think') { addThink(ev.text); }
-          else if (ev.type === 'trace') { addThink('🔧 ' + ev.text); }
+          else if (ev.type === 'trace') { addTraceLine(ev.text); }
           else if (ev.type === 'delta') {
-            // 开始输出正文 → 自动收起思考框(主流AI习惯)
-            if (thinkOpen && thinkBox) { thinkBox.querySelector('details').open = false; thinkOpen = false; }
+            // 开始输出正文 → 思考框自动收起,摘要变为"思考过程"(主流AI习惯)
+            if (thinkOpen && thinkBox) {
+              thinkBox.querySelector('details').open = false; thinkOpen = false;
+              thinkBox.querySelector('summary').childNodes[0].textContent = '💭 思考过程 ';
+            }
             ensureBot().textContent = acc += ev.text;
           }
           else if (ev.type === 'replace') { acc = ev.text; ensureBot().textContent = acc; }
           else if (ev.type === 'error') { ensureBot().textContent = (acc ? acc + '\n' : '') + '❌ ' + ev.error; }
           else if (ev.type === 'done') {
             doneData = ev;
-            if (thinkBox) { thinkBox.querySelector('details').open = false; thinkOpen = false; }
+            if (thinkBox && thinkOpen) {
+              thinkBox.querySelector('details').open = false; thinkOpen = false;
+              thinkBox.querySelector('summary').childNodes[0].textContent = '💭 思考过程 ';
+            }
             if (bot) cpFinish(bot, ev);
           }
         });
