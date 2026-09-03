@@ -168,10 +168,15 @@ function saveKeys(){
 }
 function refreshKeyState(){
   var k=keys();
-  $('keysBtn').textContent = k.nex ? '⚙ 密钥已设置 ✓' : '⚙ 设置密钥';
-  $('keysBtn').className = 'keysbtn' + (k.nex?' ok':'');
+  $('keysBtn').textContent = MODE==='render' ? '✓ 已连接后端(免Key)' : (k.nex ? '⚙ 密钥已设置 ✓' : '⚙ 设置密钥');
+  $('keysBtn').className = 'keysbtn' + (k.nex || MODE==='render' ?' ok':'');
 }
-refreshKeyState();
+var MODE='static';
+async function detectMode(){
+  try{ const r=await fetch('/api/ping'); const j=await r.json(); if(j.render) MODE='render'; }catch(e){ MODE='static'; }
+  refreshKeyState();
+}
+detectMode();
 
 /* ---------- Nexscope 搜索(直连或经代理) ---------- */
 var fullList=[], mutedCats={}, catList=[];
@@ -179,22 +184,30 @@ function nexBase(){ return keys().proxy || 'https://api.nexscope.ai/api/skill-ap
 function nexUrl(slug){ return keys().proxy ? keys().proxy+'/api/skill-api/v1/skills/'+slug+'/run' : 'https://api.nexscope.ai/api/skill-api/v1/skills/'+slug+'/run'; }
 async function doSearch(){
   var k=keys();
-  if(!k.nex){ alert('请先点右上角 ⚙ 设置 Nexscope Key'); openKeys(); return; }
+  var viaRender = MODE==='render';
+  if(!viaRender && !k.nex){ alert('请先点右上角 ⚙ 设置 Nexscope Key'); openKeys(); return; }
   var kw=$('kw').value.trim();
   if(!kw) return;
-  $('go').disabled=true; $('stat').textContent='搜索中…(约12 credits)';
+  $('go').disabled=true; $('stat').textContent='搜索中…'+(viaRender?'':'(约12 credits)');
   $('result').innerHTML='<div id="msg">搜索中，最长等60秒…</div>';
   try{
     var body={ searchType:+$('match').value, keyWord:kw, pageIndex:1, pageSize:+$('size').value,
                sortField:$('sortf').value, sortType:$('sortt').value };
-    var r=await fetch(nexUrl('1688-product-search'), { method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.nex}, body:JSON.stringify(body) });
-    var d=await r.json();
-    if(!(r.ok && d.errcode===200)) throw new Error('HTTP '+r.status+' errcode='+(d&&(d.errcode??d.code))+': '+((d&&(d.msg||d.errmsg))||'').slice(0,120));
+    var r, d;
+    if(viaRender){
+      r=await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      d=await r.json();
+      if(!(r.ok && d.errcode===200)) throw new Error(d.error || ('HTTP '+r.status+' errcode='+(d&&(d.errcode??d.code))));
+    }else{
+      r=await fetch(nexUrl('1688-product-search'), { method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.nex}, body:JSON.stringify(body) });
+      d=await r.json();
+      if(!(r.ok && d.errcode===200)) throw new Error('HTTP '+r.status+' errcode='+(d&&(d.errcode??d.code))+': '+((d&&(d.msg||d.errmsg))||'').slice(0,120));
+    }
     fullList=(d.products||[]).map(function(p){ return Object.assign({ _kw:kw }, p); });
     buildCatBar();
     render();
-    $('stat').textContent='搜索完成 · 耗时 '+d.cost+' credits · 抓取'+fullList.length+'条 · 本地筛选/排序免费';
+    $('stat').textContent='搜索完成 · 抓取'+fullList.length+'条 · 本地筛选/排序免费';
     saveHist({ kw:kw, params:body, products:fullList, time:Date.now() });
   }catch(e){
     $('result').innerHTML='<div id="msg" class="err">❌ 搜索失败: '+esc(e.message)+'<br><span style="font-size:12px;color:#B9B5A6">若为CORS/跨域错误，请按README部署代理并填入设置</span></div>';
@@ -293,20 +306,28 @@ function slimCtx(){
 async function chatSend(){
   if(busy) return;
   var k=keys();
-  if(!k.ai){ alert('请先点右上角 ⚙ 设置智谱 AI Key'); openKeys(); return; }
+  var viaRender = MODE==='render' || k.ai;
+  if(MODE!=='render' && !k.ai){ alert('请先点右上角 ⚙ 设置智谱 AI Key'); openKeys(); return; }
   var inp=$('cinp'), q=inp.value.trim(); if(!q) return;
   inp.value=''; busy=true; $('csend').disabled=true;
   addMsg('user').textContent=q;
   var think=addMsg('bot'); think.innerHTML='<div class="cthink"><details open><summary>💭 思考中…</summary><div class="tb"></div></details></div>';
   var tbox=think.querySelector('.tb'), tdetails=think.querySelector('details');
   var bot=addMsg('bot'); bot.innerHTML='<span style="color:#A6A296">…</span>';
+  var sysMsg = '你是1688采购助手(演示版)。当前页面筛选后的商品数据(最多12条): '+slimCtx()+
+    '\n用简体中文回答，用 **加粗** 和 - 列表组织，引用数据时只用上面提供的真实数字，绝不编造。';
   try{
-    var res=await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', { method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.ai},
-      body:JSON.stringify({ model:'glm-4.5-flash', thinking:{type:'enabled'}, stream:true, max_tokens:4096, messages:[
-        { role:'system', content:'你是1688采购助手(演示版)。当前页面筛选后的商品数据(最多12条): '+slimCtx()+
-          '\n用简体中文回答，用 **加粗** 和 - 列表组织，引用数据时只用上面提供的真实数字，绝不编造。' },
-        { role:'user', content:q } ] }) });
+    var res;
+    if(MODE==='render'){
+      res=await fetch('/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ messages:[ {role:'system',content:sysMsg}, {role:'user',content:q} ] }) });
+    }else{
+      res=await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', { method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.ai},
+        body:JSON.stringify({ model:'glm-4.5-flash', thinking:{type:'enabled'}, stream:true, max_tokens:4096, messages:[
+          { role:'system', content:sysMsg },
+          { role:'user', content:q } ] }) });
+    }
     if(!res.ok){ var e=await res.json().catch(function(){return{}}); throw new Error(e.error&&e.error.message||('HTTP '+res.status)); }
     var reader=res.body.getReader(), dec=new TextDecoder(), buf='', acc='', opened=false;
     for(;;){

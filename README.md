@@ -58,3 +58,15 @@ Node.js 原生 http（无 Web 框架）· LangGraph.js（StateGraph / interrupt 
   2. 页面 ⚙ 设置里填入 Nexscope Key + Worker 地址
 
 所有 Key 仅存在使用者本地浏览器 localStorage，不经过本仓库。页内功能：搜索、类目筛选、本地排序、历史记录（localStorage）、AI 对话。完整版（SKU/测评/技能/多会话等）请用本仓库的 Node 双服务本地运行。
+
+## 部署到 Render（同事免填 Key，推荐）
+
+仓库根目录已含 `render.yaml`（Blueprint）和 `render-server.js`（零依赖后端：静态页面 + 搜索代理 + AI 流式代理）。
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/HenryHuo157/1688Products)
+
+1. 点击上方按钮，用 GitHub 账号授权 Render
+2. 创建时在环境变量里填入 `NEXSCOPE_API_KEY` 和 `AI_API_KEY`（Key 只存 Render，不进代码）
+3. 部署完成后得到 `https://1688products.onrender.com`，把这个地址发给同事即可——打开就是全功能版本，**无需填任何 Key**
+
+> 免费实例 15 分钟无访问会休眠，首次打开约需 30-60 秒唤醒。渲染页面与 API 同源，无跨域问题。

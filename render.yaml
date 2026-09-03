@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: 1688products
+    runtime: node
+    plan: free
+    buildCommand: echo "零依赖，无需构建"
+    startCommand: node render-server.js
+    healthCheckPath: /api/ping
+    envVars:
+      - key: NEXSCOPE_API_KEY
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        value: https://open.bigmodel.cn/api/paas/v4
+      - key: AI_MODEL
+        value: glm-4.5-flash
