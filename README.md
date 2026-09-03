@@ -47,3 +47,14 @@ node agent.mjs         # → http://localhost:3001
 ## 技术栈
 
 Node.js 原生 http（无 Web 框架）· LangGraph.js（StateGraph / interrupt / createReactAgent）· 智谱 GLM-4.5-flash · Nexscope 1688 REST API
+
+## 在线演示 (GitHub Pages)
+
+`docs/` 目录是一个无需部署后端的静态演示页（GitHub Pages 直接打开即用）：
+
+- **AI 采购助手**：浏览器直连智谱 GLM，填入自己的智谱 Key 即可用（免费，带思考过程展示）
+- **商品搜索**：因 Nexscope API 禁止浏览器跨域直连，需两步：
+  1. 部署 `cloudflare-worker.js`（见文件头部注释，5 分钟）
+  2. 页面 ⚙ 设置里填入 Nexscope Key + Worker 地址
+
+所有 Key 仅存在使用者本地浏览器 localStorage，不经过本仓库。页内功能：搜索、类目筛选、本地排序、历史记录（localStorage）、AI 对话。完整版（SKU/测评/技能/多会话等）请用本仓库的 Node 双服务本地运行。

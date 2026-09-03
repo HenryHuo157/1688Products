@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1688 商品搜索 · 在线演示</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; background:#F5F3EC; color:#2b2620; }
+  .topbar { background:#FDFCF8; border-bottom:1px solid #E7E3D7; padding:14px 24px; display:flex;
+            justify-content:space-between; align-items:center; position:sticky; top:0; z-index:20; }
+  .topbar h1 { font-family:Georgia,"SimSun",serif; font-size:17px; color:#3D2E22; display:flex; align-items:center; gap:8px; }
+  .topbar h1::before { content:''; width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,#D97B57,#C96442);
+                       box-shadow:0 0 0 3px rgba(201,100,66,.15); }
+  .topbar .hint { font-size:11px; color:#A6A296; margin-top:2px; }
+  .keysbtn { background:none; border:1px solid #DDD8CA; color:#8F8B7E; border-radius:20px; padding:6px 16px;
+             cursor:pointer; font-size:12.5px; }
+  .keysbtn:hover { border-color:#C96442; color:#B0522F; }
+  .keysbtn.ok { border-color:#7FA98A; color:#4C7A58; }
+  .wrap { max-width:1180px; margin:0 auto; padding:20px 18px; }
+  .searchbar { background:#FDFCF8; border:1px solid #E7E3D7; border-radius:16px; padding:14px 16px;
+               display:flex; flex-wrap:wrap; gap:9px; align-items:center; box-shadow:0 1px 6px rgba(74,56,44,.05); }
+  .searchbar input[type=text], .searchbar select, .searchbar input[type=number] {
+    border:1px solid transparent; background:#F3F0E7; border-radius:11px; padding:9px 13px; font-size:14px; outline:0; color:#2b2620; }
+  .searchbar input:focus, .searchbar select:focus { border-color:#C96442; background:#fff; }
+  #kw { flex:1; min-width:200px; }
+  #go { background:linear-gradient(135deg,#D97B57,#C96442); color:#FFF7F0; border:0; border-radius:12px;
+        padding:9px 30px; font-size:14px; font-weight:600; cursor:pointer; }
+  #go:hover { background:linear-gradient(135deg,#C96442,#B0522F); }
+  #go:disabled { opacity:.55; cursor:wait; }
+  .fcard { background:#FDFCF8; border:1px solid #E7E3D7; border-radius:14px; padding:9px 14px; margin-top:10px;
+           display:flex; flex-direction:column; gap:7px; }
+  .frow { display:flex; gap:10px; align-items:flex-start; }
+  .flabel { flex-shrink:0; font-size:11.5px; color:#A6A296; padding:4px 4px 0 2px; }
+  .fchips { display:flex; flex-wrap:wrap; gap:5px; }
+  .fchips label { background:#F3F0E7; border:1px solid transparent; border-radius:980px; padding:3.5px 13px;
+                  font-size:12px; color:#5d564b; cursor:pointer; user-select:none; transition:all .12s; }
+  .fchips label:hover { background:#EAE6D9; }
+  .fchips label.off { background:#fff; border-color:#E4E0D4; color:#B9B5A6; text-decoration:line-through; }
+  .fchips label .n { opacity:.5; font-size:10.5px; margin-left:2px; }
+  .fchips input { display:none; }
+  .meta { margin:12px 2px; font-size:12.5px; color:#8F8B7E; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; }
+  table { width:100%; border-collapse:collapse; background:#FDFCF8; border-radius:14px; overflow:hidden;
+          border:1px solid #E7E3D7; box-shadow:0 1px 8px rgba(74,56,44,.05); }
+  th, td { padding:9px 11px; text-align:left; font-size:13px; border-bottom:1px solid #F0EDE3; vertical-align:middle; }
+  th { background:#F8F6EF; color:#8F8B7E; font-size:12px; font-weight:600; white-space:nowrap; position:sticky; top:57px; z-index:5; }
+  th.srt { cursor:pointer; user-select:none; }
+  th.srt:hover { color:#B0522F; }
+  th.sorted { background:#F6EAE2; color:#B0522F; box-shadow:inset 0 -2px 0 #C96442; }
+  tbody tr:hover { background:#FAF6EE; }
+  td.img img { width:60px; height:60px; object-fit:cover; border-radius:8px; background:#F3F0E7; display:block; }
+  td.title a { color:#2b2620; text-decoration:none; line-height:1.45; display:block; max-width:330px; font-weight:500; }
+  td.title a:hover { color:#B0522F; }
+  td.title .id { color:#B9B5A6; font-size:11.5px; }
+  .price { color:#B0522F; font-weight:700; white-space:nowrap; }
+  .consign { color:#8F8B7E; white-space:nowrap; }
+  td.muted { color:#8F8B7E; white-space:nowrap; }
+  #msg { text-align:center; padding:60px 20px; color:#A6A296; font-size:14px; }
+  #msg.err { color:#B0522F; }
+  /* 对话 */
+  .chatfab { position:fixed; right:22px; bottom:22px; background:linear-gradient(135deg,#D97B57,#C96442); color:#FFF7F0;
+             border:0; border-radius:980px; padding:13px 24px; font-size:14px; font-weight:600; cursor:pointer;
+             box-shadow:0 4px 18px rgba(201,100,66,.4); z-index:30; }
+  .chatwrap { position:fixed; inset:0; background:rgba(43,38,32,.35); z-index:40; display:none; }
+  .chatwrap.open { display:flex; }
+  .chat { margin:auto; width:min(760px,94vw); height:min(86vh,720px); background:#F5F3EC; border-radius:20px;
+          display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(43,38,32,.3); }
+  .chead { padding:14px 18px; background:#FDFCF8; border-bottom:1px solid #E7E3D7; display:flex;
+           justify-content:space-between; align-items:center; }
+  .chead .t { font-family:Georgia,serif; font-weight:700; font-size:15px; color:#3D2E22; }
+  .chead .d { font-size:11px; color:#A6A296; }
+  .cclose { border:0; background:none; font-size:20px; color:#8F8B7E; cursor:pointer; }
+  .clog { flex:1; overflow-y:auto; padding:16px; }
+  .cmsg { margin:9px 0; font-size:13.5px; line-height:1.8; }
+  .cmsg.user { background:#F6EAE2; border:1px solid #EBD5C8; border-radius:14px 14px 4px 14px; padding:8px 14px;
+               width:fit-content; max-width:85%; margin-left:auto; color:#4A382C; }
+  .cmsg.bot { background:#FDFCF8; border:1px solid #E7E3D7; border-radius:4px 14px 14px 14px; padding:11px 15px; }
+  .cmsg.bot b { color:#B0522F; }
+  .cthink { margin:9px 0 4px; }
+  .cthink details { background:#EFECE2; border:1px solid #E2DED1; border-radius:10px; }
+  .cthink summary { cursor:pointer; padding:7px 12px; font-size:12px; color:#8F8B7E; user-select:none; }
+  .cthink .tb { padding:4px 14px 10px; font-size:11.5px; color:#989487; line-height:1.7; white-space:pre-wrap;
+                max-height:200px; overflow-y:auto; border-top:1px dashed #E2DED1; }
+  .cfoot { padding:12px 14px; background:#FDFCF8; border-top:1px solid #E7E3D7; display:flex; gap:8px; }
+  #cinp { flex:1; border:1px solid #D9D4C5; border-radius:12px; padding:10px 14px; font-size:13.5px; outline:0; }
+  #cinp:focus { border-color:#C96442; box-shadow:0 0 0 3px rgba(201,100,66,.13); }
+  #csend { background:linear-gradient(135deg,#D97B57,#C96442); color:#FFF7F0; border:0; border-radius:12px;
+           padding:10px 22px; cursor:pointer; font-weight:600; }
+  .chip-tag { background:#F3F0E7; color:#8F8B7E; border-radius:5px; padding:1px 7px; font-size:11.5px; margin:2px 4px 2px 0; display:inline-block; }
+  .md code { background:#F3F0E7; border-radius:4px; padding:0 5px; font-size:12px; }
+  /* 设置弹窗 */
+  .modal { position:fixed; inset:0; background:rgba(43,38,32,.45); z-index:50; display:none; }
+  .modal.open { display:flex; }
+  .mbox { margin:auto; width:min(480px,92vw); background:#FDFCF8; border-radius:18px; padding:24px; }
+  .mbox h3 { font-family:Georgia,serif; margin-bottom:6px; color:#3D2E22; }
+  .mbox p { font-size:12px; color:#8F8B7E; line-height:1.7; margin-bottom:14px; }
+  .mbox label { display:block; font-size:12.5px; color:#5d564b; margin:10px 0 4px; font-weight:600; }
+  .mbox input { width:100%; border:1px solid #D9D4C5; border-radius:10px; padding:9px 12px; font-size:13px; outline:0; }
+  .mbox input:focus { border-color:#C96442; }
+  .mbox .save { width:100%; margin-top:18px; background:linear-gradient(135deg,#D97B57,#C96442); color:#FFF7F0;
+                border:0; border-radius:12px; padding:11px; font-size:14px; font-weight:600; cursor:pointer; }
+  .footnote { text-align:center; color:#B9B5A6; font-size:11.5px; margin:26px 0 10px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div><h1>1688 商品搜索 · 在线演示</h1><div class="hint">数据源: Nexscope API · AI: 智谱 GLM · Key 保存在你自己的浏览器</div></div>
+  <button class="keysbtn" id="keysBtn" onclick="openKeys()">⚙ 设置密钥</button>
+</div>
+<div class="wrap">
+  <div class="searchbar">
+    <input type="text" id="kw" placeholder="搜索1688商品，如: 保温杯 / 蓝牙耳机">
+    <select id="match"><option value="1">模糊匹配</option><option value="4">前频匹配</option></select>
+    <select id="sortf">
+      <option value="orderCount30d">近30天订单数</option>
+      <option value="saleCount30d">近30天销量(件)</option>
+      <option value="saleVolume30d">预估月销额</option>
+      <option value="price">批发价</option>
+      <option value="consignPrice">代发价</option>
+      <option value="offerCreateTime">上架时间</option>
+    </select>
+    <select id="sortt"><option value="desc">↓ 降序</option><option value="asc">↑ 升序</option></select>
+    <input type="number" id="pmin" placeholder="价格≥" style="width:82px">
+    <input type="number" id="pmax" placeholder="价格≤" style="width:82px">
+    <select id="size"><option>20</option><option selected>50</option><option>100</option></select>
+    <button id="go" onclick="doSearch()">搜 索</button>
+  </div>
+  <div class="fcard" id="fcard" style="display:none">
+    <div class="frow"><span class="flabel">类目</span><div class="fchips" id="catchips"></div></div>
+  </div>
+  <div class="meta"><span id="stat"></span><span id="pageinfo"></span></div>
+  <div id="result"><div id="msg">先点右上角 ⚙ 设置密钥，然后输入关键词开始搜索</div></div>
+  <div class="footnote">演示页面 · 销量为平台预估数据，下单前请与供应商核实 · <a href="https://github.com/HenryHuo157/1688Products" target="_blank" style="color:inherit">GitHub</a></div>
+</div>
+
+<button class="chatfab" onclick="document.getElementById('chatwrap').classList.add('open')">💬 AI 采购助手</button>
+<div class="chatwrap" id="chatwrap">
+  <div class="chat">
+    <div class="chead"><div><div class="t">💬 AI 采购助手</div><div class="d">自然语言选品建议 · 思考过程可展开</div></div>
+      <button class="cclose" onclick="document.getElementById('chatwrap').classList.remove('open')">×</button></div>
+    <div class="clog" id="clog"><div style="text-align:center;color:#A6A296;font-size:11.5px;margin:8px 0">直接说人话，例: "帮我想想采购保温杯要注意什么"</div></div>
+    <div class="cfoot"><input id="cinp" placeholder="问点什么…"><button id="csend" onclick="chatSend()">发送</button></div>
+  </div>
+</div>
+
+<div class="modal" id="keymodal">
+  <div class="mbox">
+    <h3>⚙ 设置密钥</h3>
+    <p>Key 只保存在<b>你自己浏览器</b>的 localStorage，不会上传到任何服务器。Nexscope Key 决定搜索能否使用(消耗credits)；AI Key 用于对话(免费)。</p>
+    <label>Nexscope API Key (nk-开头)</label>
+    <input id="k_nex" placeholder="nk-...">
+    <label>智谱 AI Key (可选，填了才能用AI对话)</label>
+    <input id="k_ai" placeholder="xxxxxxxx.yyyyy">
+    <label>Nexscope 代理地址 (可选，见README「跨域说明」)</label>
+    <input id="k_proxy" placeholder="https://your-worker.workers.dev">
+    <button class="save" onclick="saveKeys()">保存</button>
+  </div>
+</div>
+
+<script>
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s??'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function keys(){ try{ return JSON.parse(localStorage.getItem('p1688keys')||'{}'); }catch(e){ return {}; } }
+function openKeys(){ var k=keys(); $('k_nex').value=k.nex||''; $('k_ai').value=k.ai||''; $('k_proxy').value=k.proxy||''; $('keymodal').classList.add('open'); }
+function saveKeys(){
+  localStorage.setItem('p1688keys', JSON.stringify({ nex:$('k_nex').value.trim(), ai:$('k_ai').value.trim(), proxy:$('k_proxy').value.trim().replace(/\/+$/,'') }));
+  $('keymodal').classList.remove('open'); refreshKeyState();
+}
+function refreshKeyState(){
+  var k=keys();
+  $('keysBtn').textContent = k.nex ? '⚙ 密钥已设置 ✓' : '⚙ 设置密钥';
+  $('keysBtn').className = 'keysbtn' + (k.nex?' ok':'');
+}
+refreshKeyState();
+
+/* ---------- Nexscope 搜索(直连或经代理) ---------- */
+var fullList=[], mutedCats={}, catList=[];
+function nexBase(){ return keys().proxy || 'https://api.nexscope.ai/api/skill-api/v1/skills'; }
+function nexUrl(slug){ return keys().proxy ? keys().proxy+'/api/skill-api/v1/skills/'+slug+'/run' : 'https://api.nexscope.ai/api/skill-api/v1/skills/'+slug+'/run'; }
+async function doSearch(){
+  var k=keys();
+  if(!k.nex){ alert('请先点右上角 ⚙ 设置 Nexscope Key'); openKeys(); return; }
+  var kw=$('kw').value.trim();
+  if(!kw) return;
+  $('go').disabled=true; $('stat').textContent='搜索中…(约12 credits)';
+  $('result').innerHTML='<div id="msg">搜索中，最长等60秒…</div>';
+  try{
+    var body={ searchType:+$('match').value, keyWord:kw, pageIndex:1, pageSize:+$('size').value,
+               sortField:$('sortf').value, sortType:$('sortt').value };
+    var r=await fetch(nexUrl('1688-product-search'), { method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.nex}, body:JSON.stringify(body) });
+    var d=await r.json();
+    if(!(r.ok && d.errcode===200)) throw new Error('HTTP '+r.status+' errcode='+(d&&(d.errcode??d.code))+': '+((d&&(d.msg||d.errmsg))||'').slice(0,120));
+    fullList=(d.products||[]).map(function(p){ return Object.assign({ _kw:kw }, p); });
+    buildCatBar();
+    render();
+    $('stat').textContent='搜索完成 · 耗时 '+d.cost+' credits · 抓取'+fullList.length+'条 · 本地筛选/排序免费';
+    saveHist({ kw:kw, params:body, products:fullList, time:Date.now() });
+  }catch(e){
+    $('result').innerHTML='<div id="msg" class="err">❌ 搜索失败: '+esc(e.message)+'<br><span style="font-size:12px;color:#B9B5A6">若为CORS/跨域错误，请按README部署代理并填入设置</span></div>';
+    $('stat').textContent='';
+  }
+  $('go').disabled=false;
+}
+function buildCatBar(){
+  var counts={};
+  fullList.forEach(function(p){ var c=(p.levelName||'').split(/>|,/).pop().trim()||'其他'; p._cat=c; counts[c]=(counts[c]||0)+1; });
+  catList=Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; });
+  mutedCats={};
+  $('catchips').innerHTML=catList.map(function(c){
+    return '<label onclick="toggleCat(\''+esc(c).replace(/'/g,"\\'")+'\',this)">'+esc(c)+'<span class="n">×'+counts[c]+'</span></label>';
+  }).join('');
+  $('fcard').style.display = catList.length?'flex':'none';
+}
+function toggleCat(c, el){
+  mutedCats[c]=!mutedCats[c];
+  el.classList.toggle('off', !!mutedCats[c]);
+  render();
+}
+function shown(){
+  return fullList.filter(function(p){
+    return !mutedCats[p._cat] &&
+      (!$('pmin').value || Number(p.price)>=$('pmin').value) &&
+      (!$('pmax').value || Number(p.price)<=$('pmax').value);
+  });
+}
+function render(){
+  var list=shown();
+  var f=$('sortf').value, t=$('sortt').value;
+  var val=function(x){ switch(f){ case 'price':return Number(x.price); case 'consignPrice':return Number(x.consignPrice);
+    case 'orderCount30d':return Number(x.salesOrderCount||0); case 'saleCount30d':return Number(x.salesQuantity||0);
+    case 'saleVolume30d':return Number(x.estimatedSalesAmount||0); case 'offerCreateTime':return String(x.availableDate||''); } return 0; };
+  list=list.slice().sort(function(a,b){ var va=val(a),vb=val(b);
+    if(typeof va==='string'||typeof vb==='string') return t==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+    return t==='asc'?va-vb:vb-va; });
+  if(!list.length){ $('result').innerHTML='<div id="msg">筛选后没有商品</div>'; $('pageinfo').textContent=''; return; }
+  var h='<table><thead><tr><th></th><th>商品标题</th><th>批发价</th><th>代发价</th><th>起订量</th><th>近30天订单</th><th>近30天销量</th><th>月销额</th><th>类目</th><th>供应商</th><th>发货</th></tr></thead><tbody>';
+  list.slice(0,100).forEach(function(p){
+    h+='<tr>'+
+      '<td class="img">'+(p.imageUrl?'<img loading="lazy" src="'+esc(p.imageUrl)+'">':'')+'</td>'+
+      '<td class="title"><a href="'+esc(p.asinUrl||p.productUrl||('#'))+'" target="_blank" rel="noopener">'+esc(p.title)+'</a>'+
+        '<div class="id">ID: '+esc(p.offerId||'')+(p.province?' · '+esc(p.province):'')+'</div></td>'+
+      '<td class="price">'+(p.price!=null?'¥'+p.price:'—')+'</td>'+
+      '<td class="consign">'+(p.consignPrice!=null?'¥'+p.consignPrice:'—')+'</td>'+
+      '<td class="muted">'+(p.quantityBegin!=null?esc(String(p.quantityBegin))+(p.unit||''):'—')+'</td>'+
+      '<td>'+(p.salesOrderCount!=null?Number(p.salesOrderCount).toLocaleString():'—')+'</td>'+
+      '<td>'+(p.salesQuantity!=null?Number(p.salesQuantity).toLocaleString():'—')+'</td>'+
+      '<td>'+(p.estimatedSalesAmount!=null?'¥'+Number(p.estimatedSalesAmount).toLocaleString():'—')+'</td>'+
+      '<td class="muted" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p._cat)+'</td>'+
+      '<td class="muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.company||'—')+'</td>'+
+      '<td class="muted">'+(p.deliveryTime?esc(String(p.deliveryTime))+'h':'—')+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  $('result').innerHTML=h;
+  $('pageinfo').textContent='显示 '+list.length+' 条 (共抓取 '+fullList.length+' 条)';
+}
+['pmin','pmax','sortf','sortt'].forEach(function(id){ $(id).addEventListener('change',function(){ if(fullList.length) render(); }); });
+
+/* ---------- 本地历史(localStorage) ---------- */
+function saveHist(rec){
+  var h=[]; try{ h=JSON.parse(localStorage.getItem('p1688hist')||'[]'); }catch(e){}
+  h=h.filter(function(x){ return x.kw!==rec.kw; });
+  h.unshift({ kw:rec.kw, params:rec.params, time:Date.now(), n:rec.products.length });
+  localStorage.setItem('p1688hist', JSON.stringify(h.slice(0,15)));
+}
+function quickSearch(kw){
+  $('kw').value=kw; doSearch();
+}
+
+/* ---------- AI 对话(智谱直连, 流式+思考) ---------- */
+var busy=false;
+function addMsg(cls){ var d=document.createElement('div'); d.className='cmsg '+cls;
+  var lg=$('clog'); lg.appendChild(d); lg.scrollTop=lg.scrollHeight; return d; }
+function md(t){
+  var s=esc(t), out=[], ul=false;
+  s.split('\n').forEach(function(ln){
+    ln=ln.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+    var li=ln.match(/^\s*[-*]\s+(.*)/);
+    if(li){ if(!ul){out.push('<ul style="margin:4px 0 4px 18px">');ul=true;} out.push('<li style="margin:3px 0">'+li[1]+'</li>'); return; }
+    if(ul){out.push('</ul>');ul=false;}
+    if(ln.trim()===''){out.push('<div style="height:6px"></div>');return;}
+    out.push('<div>'+ln+'</div>');
+  });
+  if(ul)out.push('</ul>');
+  return out.join('');
+}
+function slimCtx(){
+  var list=shown().slice(0,12).map(function(p){ return { 标题:String(p.title||'').slice(0,30), 批发价:p.price, 代发价:p.consignPrice,
+    订单:p.salesOrderCount, 销量:p.salesQuantity, 月销额:p.estimatedSalesAmount, 公司:p.company, 产地:p.province }; });
+  if(!list.length) return '(当前无数据)';
+  return JSON.stringify(list);
+}
+async function chatSend(){
+  if(busy) return;
+  var k=keys();
+  if(!k.ai){ alert('请先点右上角 ⚙ 设置智谱 AI Key'); openKeys(); return; }
+  var inp=$('cinp'), q=inp.value.trim(); if(!q) return;
+  inp.value=''; busy=true; $('csend').disabled=true;
+  addMsg('user').textContent=q;
+  var think=addMsg('bot'); think.innerHTML='<div class="cthink"><details open><summary>💭 思考中…</summary><div class="tb"></div></details></div>';
+  var tbox=think.querySelector('.tb'), tdetails=think.querySelector('details');
+  var bot=addMsg('bot'); bot.innerHTML='<span style="color:#A6A296">…</span>';
+  try{
+    var res=await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', { method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+k.ai},
+      body:JSON.stringify({ model:'glm-4.5-flash', thinking:{type:'enabled'}, stream:true, max_tokens:4096, messages:[
+        { role:'system', content:'你是1688采购助手(演示版)。当前页面筛选后的商品数据(最多12条): '+slimCtx()+
+          '\n用简体中文回答，用 **加粗** 和 - 列表组织，引用数据时只用上面提供的真实数字，绝不编造。' },
+        { role:'user', content:q } ] }) });
+    if(!res.ok){ var e=await res.json().catch(function(){return{}}); throw new Error(e.error&&e.error.message||('HTTP '+res.status)); }
+    var reader=res.body.getReader(), dec=new TextDecoder(), buf='', acc='', opened=false;
+    for(;;){
+      var r2=await reader.read(); if(r2.done) break;
+      buf+=dec.decode(r2.value,{stream:true});
+      var lines=buf.split('\n'); buf=lines.pop();
+      for(var i=0;i<lines.length;i++){
+        var s=lines[i].trim(); if(!s.startsWith('data:')) continue;
+        var p=s.slice(5).trim(); if(p==='[DONE]') continue;
+        try{ var delta=JSON.parse(p).choices[0].delta||{};
+          if(delta.reasoning_content){ if(!opened){opened=true; lgScroll();} tbox.textContent+=delta.reasoning_content; tbox.scrollTop=tbox.scrollHeight; }
+          if(delta.content){ if(tdetails.hasAttribute('open')){tdetails.removeAttribute('open'); think.querySelector('summary').textContent='💭 思考过程(点击展开)';}
+            acc+=delta.content; bot.innerHTML=md(acc); }
+        }catch(e){}
+      }
+      lgScroll();
+    }
+    if(!acc) bot.innerHTML='<span style="color:#A6A296">(空回复)</span>';
+  }catch(e){ bot.innerHTML='❌ '+esc(e.message); }
+  busy=false; $('csend').disabled=false;
+}
+function lgScroll(){ var lg=$('clog'); lg.scrollTop=lg.scrollHeight; }
+$('cinp').addEventListener('keydown',function(e){ if(e.key==='Enter') chatSend(); });
+$('chatwrap').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
+$('keymodal').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
+</script>
+</body>
+</html>
