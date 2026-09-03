@@ -3,3 +3,6 @@
 node_modules/
 __pycache__/
 req_rs.json
+mcp_out.txt
+mcp_reply.txt
+1688_history.json

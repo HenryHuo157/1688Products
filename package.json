@@ -1,0 +1,27 @@
+{
+  "name": "1688products",
+  "version": "1.0.0",
+  "description": "基于 Nexscope 1688 API 的商品搜索工具，内置 LangGraph.js 驱动的 AI 采购助手（GLM）。",
+  "main": "cloudflare-worker.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HenryHuo157/1688Products.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/HenryHuo157/1688Products/issues"
+  },
+  "homepage": "https://github.com/HenryHuo157/1688Products#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}
