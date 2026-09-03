@@ -987,13 +987,14 @@ function cpMD(t) {
       out.push(th + '</tbody></table></div>');
       continue;
     }
-    var hh = ln.match(/^(#{1,4})\s+(.*)/);
+    var hh = ln.match(/^\s*#{1,4}\s+(.*)/);
     if (hh) {
       closeLists();
       var big = hh[1].length <= 2;
       out.push('<div style="font-weight:700;font-size:' + (big ? '14px' : '13px') + ';color:#B0522F;margin:10px 0 5px;border-left:3px solid #C96442;padding-left:8px;line-height:1.5">' + inline(hh[2]) + '</div>');
       i++; continue;
     }
+    if (/^\s*([-*_]\s*){3,}$/.test(ln)) { closeLists(); out.push('<hr style="border:0;border-top:1px solid #E7E3D7;margin:8px 0">'); i++; continue; }
     var uli = ln.match(/^\s*[-*]\s+(.*)/);
     if (uli) {
       if (inOl) { out.push('</ol>'); inOl = false; }
@@ -1166,9 +1167,9 @@ function cpSend(text, confirm) {
               thinkBox.querySelector('details').open = false; thinkOpen = false;
               thinkBox.querySelector('summary').childNodes[0].textContent = '💭 思考过程 ';
             }
-            ensureBot().textContent = acc += ev.text;
+            ensureBot().innerHTML = cpMD(acc += ev.text);   // 边流式边渲染,不裸奔原始markdown
           }
-          else if (ev.type === 'replace') { acc = ev.text; ensureBot().textContent = acc; }
+          else if (ev.type === 'replace') { acc = ev.text; ensureBot().innerHTML = cpMD(acc); }
           else if (ev.type === 'error') { ensureBot().textContent = (acc ? acc + '\n' : '') + '❌ ' + ev.error; }
           else if (ev.type === 'done') {
             doneData = ev;
