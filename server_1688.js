@@ -245,8 +245,18 @@ const HTML = String.raw`<!DOCTYPE html>
   .chatpanel { position:fixed; top:0; right:0; width:680px; max-width:96vw; height:100vh; background:#F5F3EC;
                z-index:60; transition:transform .25s; transform:translateX(105%); display:flex; flex-direction:column; box-shadow:-6px 0 26px rgba(60,50,30,.16); }
   .chatpanel.open { transform:none; }
-  .cp-resize { position:absolute; left:-3px; top:0; width:7px; height:100%; cursor:ew-resize; z-index:5; }
-  .cp-resize:hover { background:rgba(201,100,66,.18); }
+  .cp-resize { position:absolute; left:-3px; top:0; width:9px; height:100%; cursor:ew-resize; z-index:5; }
+  .cp-resize::before { content:''; position:absolute; left:2px; top:50%; transform:translateY(-50%);
+                       width:4px; height:42px; border-radius:3px; background:#D9D4C5; transition:all .15s; }
+  .cp-resize::after { content:'⟨'; position:absolute; left:0.5px; top:50%; transform:translateY(-50%);
+                      font-size:9px; color:#fff; opacity:0; transition:opacity .15s; }
+  .cp-resize:hover { background:rgba(201,100,66,.14); }
+  .cp-resize:hover::before { background:#C96442; width:5px; }
+  .cp-resize:hover::after { opacity:1; left:1.5px; }
+  .cp-resize-tip { position:absolute; left:14px; top:50%; transform:translateY(-50%); background:#26241F; color:#FFF3EA;
+                   font-size:11.5px; padding:6px 12px; border-radius:8px; white-space:nowrap; z-index:6;
+                   box-shadow:0 3px 12px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .3s; }
+  .cp-resize-tip.show { opacity:1; }
   .cp-head { padding:13px 18px; display:flex; justify-content:space-between; align-items:center; gap:10px;
              border-bottom:1px solid #E7E3D7; background:#FDFCF8;
              box-shadow:0 1px 0 rgba(201,100,66,.08), 0 2px 10px rgba(74,56,44,.05); }
@@ -426,7 +436,7 @@ const HTML = String.raw`<!DOCTYPE html>
 </div>
 <div id="jserr"></div>
 <div class="chatpanel" id="chatpanel">
-  <div class="cp-resize" id="cpResize" title="拖动调整宽度"></div>
+  <div class="cp-resize" id="cpResize" title="拖动调整宽度"><div class="cp-resize-tip" id="cpTip">⇔ 拖这里可拉宽面板</div></div>
   <div class="cp-head"><div><div class="t">AI 采购助手</div><div class="d">自然语言筛选 · 数据仓复用免费 · 精查前先报价 · 左缘可拖宽</div></div><div class="btns"><button class="cp-export" id="cpExport" title="把本次对话导出为Markdown,可直接贴进采购报告">⬇ 导出</button><button class="cp-close" id="cpClose" title="关闭">×</button></div></div>
   <div class="cp-body">
     <div class="cp-side" id="cpSide">
@@ -1245,6 +1255,8 @@ $('cpSessList').addEventListener('click', function(e) {
   if (saved >= 400 && saved <= window.innerWidth * 0.95) panel.style.width = saved + 'px';
   h.addEventListener('mousedown', function(e) {
     e.preventDefault();
+    var tip = document.getElementById('cpTip'); if (tip) tip.classList.remove('show');
+    localStorage.setItem('cpTip1688', '1');
     var startX = e.clientX, w0 = panel.getBoundingClientRect().width;
     function mv(ev) {
       var w = Math.min(Math.max(w0 + (startX - ev.clientX), 400), window.innerWidth * 0.95);
@@ -1285,7 +1297,16 @@ $('cpExport').onclick = function() {
   a.download = 'AI采购对话_' + new Date().toISOString().slice(0, 10) + '.md';
   a.click(); URL.revokeObjectURL(a.href);
 };
-$('chatOpen').onclick = () => { $('chatpanel').classList.add('open'); $('cpInp').focus(); loadCpSessions(); };
+$('chatOpen').onclick = () => {
+  $('chatpanel').classList.add('open'); $('cpInp').focus(); loadCpSessions();
+  // 新人引导: 首次打开面板时提示左缘可拖宽,4秒后消失(拖过或看过一次就不再出现)
+  if (!localStorage.getItem('cpTip1688')) {
+    var tip = document.getElementById('cpTip');
+    tip.classList.add('show');
+    setTimeout(function(){ tip.classList.remove('show'); }, 4000);
+    localStorage.setItem('cpTip1688', '1');
+  }
+};
 $('cpClose').onclick = () => { $('chatpanel').classList.remove('open'); };
 $('cpSend').onclick = () => { var i = $('cpInp'); var v = i.value.trim(); if (v) { i.value = ''; cpSend(v); } };
 $('cpInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { var v = $('cpInp').value.trim(); if (v) { $('cpInp').value = ''; cpSend(v); } } });
