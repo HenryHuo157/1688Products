@@ -1,0 +1,11 @@
+{
+  "name": "nexscope-ai-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "1688 AI 采购助手 - LangGraph.js 编排",
+  "dependencies": {
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.4.0"
+  }
+}
