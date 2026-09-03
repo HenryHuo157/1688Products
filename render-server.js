@@ -70,8 +70,11 @@ const server = http.createServer(async (req, res) => {
       if (!AI_KEY) return json(res, 500, { error: '服务端未配置 AI_API_KEY' });
       const raw = await readBody(req);
       const body = JSON.parse(raw || '{}');
-      const payload = JSON.stringify({ model: AI_MODEL, thinking: { type: 'enabled' }, stream: true,
-        max_tokens: 4096, messages: body.messages || [] });
+      // 智谱带thinking参数; OpenRouter等OpenAI兼容端点不带
+      const isZhipu = AI_BASE.includes('bigmodel');
+      const payload = JSON.stringify(Object.assign(
+        { model: AI_MODEL, stream: true, max_tokens: 4096, messages: body.messages || [] },
+        isZhipu ? { thinking: { type: 'enabled' } } : {}));
       const up = await postJSONStream(AI_BASE + '/chat/completions',
         { 'Authorization': 'Bearer ' + AI_KEY }, payload, res);
       return up;
