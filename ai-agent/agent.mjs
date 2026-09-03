@@ -43,7 +43,7 @@ const llm = new ChatOpenAI({
 });
 // 意图解析/JSON提取用: 关思考、低温,保证JSON稳定且不被思考挤占token
 const llmFast = new ChatOpenAI({
-  model: AI_MODEL, apiKey: AI_KEY, temperature: 0.1, maxTokens: 2048, maxRetries: 1,
+  model: AI_MODEL, apiKey: AI_KEY, temperature: 0.1, maxTokens: 6000, maxRetries: 1,
   configuration: { baseURL: AI_BASE },
   modelKwargs: { thinking: { type: 'disabled' } },
 });
@@ -51,11 +51,32 @@ const llmFast = new ChatOpenAI({
 /* ---------- LLM JSON 输出工具 ---------- */
 function extractJSON(txt) {
   let t = String(txt).replace(/```(json)?/gi, '').trim();
-  const s = t.search(/[\[{]/);
-  if (s === -1) throw new Error('LLM未返回JSON');
+  const st = t.search(/[{[]/);
+  if (st === -1) throw new Error('LLM未返回JSON');
+  t = t.slice(st);
   const e = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
-  return JSON.parse(t.slice(s, e + 1));
+  if (e === -1) throw new Error('LLM未返回JSON');
+  t = t.slice(0, e + 1);
+  try { return JSON.parse(t); } catch (_) {}
+  // 截断自愈: 思考链挤占token导致JSON不完整时,补齐缺失括号再试
+  let open = 0, openSq = 0, inStr = false, esc = false;
+  for (const ch of t) {
+    if (esc) { esc = false; continue; }
+    if (ch === String.fromCharCode(92)) { esc = true; continue; }
+    if (ch === String.fromCharCode(34)) inStr = !inStr;
+    if (inStr) continue;
+    if (ch === '{') open++;
+    if (ch === '}') open--;
+    if (ch === '[') openSq++;
+    if (ch === ']') openSq--;
+  }
+  let fixed = t;
+  if (inStr) fixed += String.fromCharCode(34);
+  fixed = fixed.replace(/,s*$/, '');
+  fixed += ']'.repeat(Math.max(openSq, 0)) + '}'.repeat(Math.max(open, 0));
+  return JSON.parse(fixed);
 }
+
 async function askJSON(system, user) {
   const res = await llmFast.invoke([{ role: 'system', content: system }, { role: 'user', content: user }]);
   return extractJSON(String(res.content));
